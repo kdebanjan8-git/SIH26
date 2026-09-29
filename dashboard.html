@@ -181,6 +181,12 @@
     .status-red { background: #fee2e2; color: #b91c1c; }
     .status-orange { background: #fef3c7; color: #b45309; }
 
+    .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-weight: 800; font-size: 11px; margin-bottom: 8px; }
+    .badge-green { background: #dcfce7; color: #15803d; }
+    .badge-red { background: #fee2e2; color: #b91c1c; }
+    .badge-orange { background: #fef3c7; color: #b45309; }
+    .badge-purple { background: #f3e8ff; color: #7e22ce; }
+
     /* VIEW 2: 3D Spatial Map Canvas Container */
     #cesiumViewContainer {
       position: absolute; top: 67px; left: 0; width: 100%; height: calc(100% - 67px); z-index: 5; display: none;
@@ -209,6 +215,23 @@
     .dot { width: 8px; height: 8px; border-radius: 50%; }
 
     .code-pill { font-family: ui-monospace, monospace; color: #b45309; background: #fffbeb; padding: 2px 6px; border-radius: 4px; font-size: 11.5px; }
+
+    .conf-box {
+      margin: 10px 0; padding: 10px 12px; border-radius: 8px;
+      background: #f8fafc; border: 1px solid #e2e8f0;
+    }
+    .conf-header { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 6px; }
+    .conf-bar-bg { background: #e2e8f0; border-radius: 4px; height: 7px; overflow: hidden; }
+    .conf-bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
+    .conf-sub { font-size: 10.5px; color: #64748b; margin-top: 5px; }
+
+    .resident-card {
+      margin-top: 12px; padding: 12px; border-radius: 8px;
+      background: #fefce8; border: 1px solid #fef08a;
+    }
+    .resident-card h4 { font-size: 12px; color: #b45309; margin: 0 0 8px 0; }
+    .resident-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11px; }
+    .resident-grid span { color: #64748b; }
 
     .action-group { display: flex; gap: 8px; margin-top: 14px; flex-direction: column; }
     .btn-action {
@@ -490,7 +513,6 @@
       }
     };
 
-    // Alias map pointers
     roleConfig['govt'] = roleConfig['dept_officer'];
     roleConfig['department_officer'] = roleConfig['dept_officer'];
     roleConfig['enquiry'] = roleConfig['enquiry_officer'];
@@ -597,16 +619,30 @@
       .then(d => { residentDatabase = d; })
       .catch(err => console.warn('Resident database load deferred:', err));
 
+    function renderConfidenceWidget(score, provenance) {
+      const barColor = score >= 95 ? 'linear-gradient(90deg, #38bdf8, #16a34a)' : 'linear-gradient(90deg, #f59e0b, #dc2626)';
+      return `
+        <div class="conf-box">
+          <div class="conf-header">
+            <span><b>Multi-Sensor Confidence:</b> <span style="color:#d97706; font-weight:800;">${score.toFixed(1)}%</span></span>
+            <span style="color:#64748b; font-size:10px;">${score >= 95 ? 'High Consensus' : 'Review Advisory'}</span>
+          </div>
+          <div class="conf-bar-bg">
+            <div class="conf-bar-fill" style="width: ${score}%; background: ${barColor};"></div>
+          </div>
+          <div class="conf-sub"><b>Data Source:</b> ${provenance}</div>
+        </div>
+      `;
+    }
+
     // ================= 1. MOUZA SEGMENTATION FILTER =================
     window.filterMouzaZone = function(zoneKey) {
-      // Sync dropdown selections across top nav and map ribbon
       const hSelect = document.getElementById('headerMouzaFilter');
       const mSelect = document.getElementById('mouzaFilter');
       if (hSelect) hSelect.value = zoneKey;
       if (mSelect) mSelect.value = zoneKey;
 
       if (!district2DSource) {
-        // If map viewer is not initialized yet, switch to map view tab!
         switchView('map');
         return;
       }
@@ -725,8 +761,9 @@
             .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 24px 0; font-size: 13.5px; }
             .grid div span { color: #64748b; font-size: 11.5px; display: block; text-transform: uppercase; font-weight: 700; }
             .audit-box {
-              background: #f8fafc; border: 1px solid #cbd5e1; padding: 16px;
-              border-radius: 8px; margin: 24px 0; font-size: 13px;
+              background: ${isRed ? '#fef2f2' : (isOrange ? '#fffbeb' : '#f0fdf4')};
+              border: 1px solid ${isRed ? '#fca5a5' : (isOrange ? '#fde68a' : '#bbf7d0')};
+              padding: 16px; border-radius: 8px; margin: 24px 0; font-size: 13px;
             }
             .table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 12.5px; }
             .table th, .table td { border: 1px solid #cbd5e1; padding: 10px; text-align: left; }
@@ -757,9 +794,9 @@
           </div>
 
           <div class="audit-box">
-            <b>Multi-Sensor Audit Determination:</b><br>
+            <b style="color:${stampColor}; font-size:14px;">Multi-Sensor Audit Determination (${stampText}):</b><br>
             ${d.action}<br>
-            <span style="font-size: 11.5px; color: #475569;">Volume Discrepancy Variance: +${d.variance}% | Multi-Sensor Consensus: ${d.confidence.toFixed(1)}%</span>
+            <span style="font-size: 11.5px; color: #475569;">Volume Discrepancy Variance: <b>+${d.variance}%</b> | Multi-Sensor Consensus: <b>${d.confidence.toFixed(1)}%</b></span>
           </div>
 
           <table class="table">
@@ -776,19 +813,19 @@
                 <td>Airborne LiDAR Survey</td>
                 <td>Elevation: ${d.extrudedH.toFixed(1)}m</td>
                 <td>Sanctioned: ${(d.baseH + (isRed ? -3.2 : 0)).toFixed(1)}m</td>
-                <td style="color:${isRed ? '#dc2626' : '#059669'}; font-weight:700;">${isRed ? 'BREACH (+28%)' : 'COMPLIANT'}</td>
+                <td style="color:${isRed ? '#dc2626' : '#059669'}; font-weight:700;">${isRed ? 'BREACH (+28%)' : (isOrange ? 'UNVERIFIED ANOMALY' : 'COMPLIANT')}</td>
               </tr>
               <tr>
                 <td>AI Floorplan Vectorizer</td>
                 <td>Strata Boundary: Orthogonal OBB</td>
                 <td>Sanctioned CAD Floorplan</td>
-                <td style="color:#059669; font-weight:700;">MATCH (91.8% mIoU)</td>
+                <td style="color:${isOrange ? '#d97706' : '#059669'}; font-weight:700;">${isOrange ? 'UNREGISTERED PLINTH' : 'MATCH (91.8% mIoU)'}</td>
               </tr>
               <tr>
                 <td>Revenue Registry</td>
                 <td>Tax Clearance: ${d.resident.tax_clearance}</td>
                 <td>Financial Year 2026 Assessment</td>
-                <td style="color:${d.resident.tax_clearance === 'PAID' ? '#059669' : '#d97706'}; font-weight:700;">${d.resident.tax_clearance}</td>
+                <td style="color:${d.resident.tax_clearance === 'PAID' ? '#059669' : (isOrange ? '#d97706' : '#dc2626')}; font-weight:700;">${d.resident.tax_clearance}</td>
               </tr>
             </tbody>
           </table>
@@ -837,7 +874,6 @@
 
       let dxf = "0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n";
 
-      // Bottom face
       for (let i = 1; i < pts.length - 1; i++) {
         dxf += `0\n3DFACE\n8\nCADASTRAL_3D_STRATA\n`;
         dxf += `10\n${pts[0].x}\n20\n${pts[0].y}\n30\n${z0}\n`;
@@ -845,7 +881,6 @@
         dxf += `12\n${pts[i+1].x}\n22\n${pts[i+1].y}\n32\n${z0}\n`;
         dxf += `13\n${pts[i+1].x}\n23\n${pts[i+1].y}\n33\n${z0}\n`;
       }
-      // Top face
       for (let i = 1; i < pts.length - 1; i++) {
         dxf += `0\n3DFACE\n8\nCADASTRAL_3D_STRATA\n`;
         dxf += `10\n${pts[0].x}\n20\n${pts[0].y}\n30\n${z1}\n`;
@@ -853,7 +888,6 @@
         dxf += `12\n${pts[i+1].x}\n22\n${pts[i+1].y}\n32\n${z1}\n`;
         dxf += `13\n${pts[i+1].x}\n23\n${pts[i+1].y}\n33\n${z1}\n`;
       }
-      // Side quads
       for (let i = 0; i < pts.length; i++) {
         const p1 = pts[i];
         const p2 = pts[(i + 1) % pts.length];
@@ -917,7 +951,7 @@
           const isPlot = p.is_plot_boundary ? p.is_plot_boundary.getValue() : false;
           const isSub = p.is_subsurface ? p.is_subsurface.getValue() : false;
           const etype = p.entity_type ? p.entity_type.getValue() : "building";
-          let hex = p.fill_color.getValue();
+          let hex = p.fill_color ? p.fill_color.getValue() : '#16a34a';
 
           if (isPlot) {
             ent.polygon.material = Cesium.Color.fromCssColorString('#facc15').withAlpha(0.08);
@@ -973,7 +1007,7 @@
 
           if (etype === "vacant_land") {
             panel.innerHTML = `
-              <div><span class="badge-status status-orange">🟧 DETECTED UNCLAIMED</span></div>
+              <div><span class="badge badge-orange">🟧 DETECTED UNCLAIMED</span></div>
               <b>2D ULPIN:</b> <code class="code-pill">${p.parcel_id.getValue()}</code><br>
               <b>Entity:</b> ${p.name.getValue()}<br>
               <b>Category:</b> Vacant Commercial Plot<br>
@@ -991,49 +1025,110 @@
 
           extrudeBuildingTo3D(picked.id);
         } else if (p.is_3d_unit) {
+          const isSub = p.is_subsurface ? p.is_subsurface.getValue() : false;
           const ulpin = p['3D_ULPIN'].getValue();
           const conf = p.confidence_score ? p.confidence_score.getValue() : 96.5;
-          const status = p.audit_state ? p.audit_state.getValue() : "GREEN";
-          const resData = residentDatabase[ulpin] || { occupant_name: "Casadona IT Enterprise", masked_aadhaar: "XXXX-9482", carpet_area_sqft: 930, tax_clearance: "PAID" };
+          const prov = p.sensor_source ? p.sensor_source.getValue() : "LiDAR + AI Model Consensus";
 
-          currentSelectedUnitData = {
-            ulpin: ulpin, buildingName: p.building_name.getValue(), floorLabel: p.floor_label.getValue(), unitLabel: p.unit_label.getValue(),
-            baseH: p.base_h.getValue(), extrudedH: p.extruded_h.getValue(), confidence: conf, status: status, action: p.action.getValue(), variance: p.variance.getValue(), resident: resData,
-            hierarchy: picked.id.polygon ? picked.id.polygon.hierarchy.getValue(Cesium.JulianDate.now()) : null
-          };
+          if (isSub) {
+            panel.innerHTML = `
+              <div><span class="badge badge-purple">${p.utility_authority.getValue()}</span></div>
+              <b>3D ULPIN:</b> <code class="code-pill">${ulpin}</code><br>
+              <b>Infrastructure:</b> ${p.building_name.getValue()}<br>
+              <b>Geometry:</b> ${p.geometry_spec.getValue()}<br>
+              <b>Level:</b> ${p.floor_label.getValue()}<br>
+              ${renderConfidenceWidget(conf, prov)}
+              <b>Centerline Elevation:</b> ${p.depth_center.getValue().toFixed(1)}m Depth Datum<br>
+            `;
+          } else {
+            const status = p.audit_state ? p.audit_state.getValue() : "GREEN";
+            const isRed = (status === 'RED');
+            const isOrange = (status === 'ORANGE');
 
-          panel.innerHTML = `
-            <b>3D ULPIN:</b> <code class="code-pill">${ulpin}</code><br>
-            <b>Structure:</b> ${p.building_name.getValue()}<br>
-            <b>Unit:</b> ${p.floor_label.getValue()} (${p.unit_label.getValue()})<br>
-            <b>Claimant:</b> <b>${resData.occupant_name}</b><br>
-            <b>Tax Clearance:</b> <b style="color:${resData.tax_clearance === 'PAID' ? '#16a34a' : '#dc2626'};">${resData.tax_clearance}</b><br>
-            <div class="action-group">
-              <button class="btn-action btn-claim" onclick="alert('Claim Verified for ${ulpin}')">✓ Verify Strata Claim</button>
-              <button class="btn-action btn-report" onclick="generateAuditCertificate()">📄 Generate Official Audit Certificate</button>
-              <button class="btn-action btn-cad" onclick="exportCurrentUnitToCAD()">📐 Export 3D Unit to CAD (.DXF)</button>
-            </div>
-          `;
+            let badgeHtml = isRed
+              ? `<span class="badge badge-red">🟥 SUSPICIOUS / MISMATCHED</span>`
+              : (isOrange ? `<span class="badge badge-orange">🟧 DETECTED BUT UNCLAIMED</span>` : `<span class="badge badge-green">🟩 VERIFIED MATCH (TRUE)</span>`);
+
+            const resData = residentDatabase[ulpin] || {
+              occupant_name: isRed ? "Unauthorized Occupant / Under Dispute" : (isOrange ? "Unregistered Claimant" : "Casadona IT Enterprise Hub"),
+              occupancy_type: "Commercial Office",
+              masked_aadhaar: "XXXX-XXXX-9482",
+              carpet_area_sqft: 930,
+              annual_unit_tax_inr: 20500,
+              tax_clearance: (isOrange || isRed ? "DEFAULT" : "PAID")
+            };
+
+            currentSelectedUnitData = {
+              ulpin: ulpin,
+              buildingName: p.building_name.getValue(),
+              floorLabel: p.floor_label.getValue(),
+              unitLabel: p.unit_label.getValue(),
+              baseH: p.base_h.getValue(),
+              extrudedH: p.extruded_h.getValue(),
+              confidence: conf,
+              sensorSource: prov,
+              status: status,
+              action: p.action.getValue(),
+              variance: p.variance.getValue(),
+              resident: resData,
+              hierarchy: picked.id.polygon ? picked.id.polygon.hierarchy.getValue(Cesium.JulianDate.now()) : null
+            };
+
+            panel.innerHTML = `
+              <div>${badgeHtml}</div>
+              <b>3D ULPIN:</b> <code class="code-pill">${ulpin}</code><br>
+              <b>Structure:</b> ${p.building_name.getValue()}<br>
+              <b>Strata Unit:</b> ${p.floor_label.getValue()} (${p.unit_label.getValue()})<br>
+              ${renderConfidenceWidget(conf, prov)}
+              <b>Z-Elevation:</b> ${p.base_h.getValue().toFixed(1)}m to ${p.extruded_h.getValue().toFixed(1)}m<br>
+              <b>Volume Variance:</b> <span style="color:${isRed ? '#dc2626' : (isOrange ? '#d97706' : '#16a34a')}; font-weight:700;">+${p.variance.getValue()}%</span><br>
+              <div style="margin-top:6px; font-size:11px; color:#475569; border-top:1px solid #cbd5e1; padding-top:6px;">
+                <b>Audit Action:</b> ${p.action.getValue()}
+              </div>
+              <div class="resident-card">
+                <h4>Dataset 1 & 2 Verification Dossier</h4>
+                <div class="resident-grid">
+                  <div><span>Registered Claimant:</span> <b>${resData.occupant_name}</b></div>
+                  <div><span>ID Hash:</span> <b>${resData.masked_aadhaar}</b></div>
+                  <div><span>Carpet Area:</span> ${resData.carpet_area_sqft} sqft</div>
+                  <div><span>Govt Tax Status:</span> <b id="taxStatusVal" style="color:${resData.tax_clearance === 'PAID' ? '#16a34a' : '#dc2626'};">${resData.tax_clearance}</b></div>
+                </div>
+              </div>
+              <div class="action-group">
+                <button class="btn-action btn-claim" onclick="alert('Claim Verified for ${ulpin}')">✓ Verify Strata Claim</button>
+                ${isRed ? `<button class="btn-action btn-notice" onclick="alert('Section 217 Violation Notice Issued for ${ulpin}')">⚖️ Issue Section 217 Violation Notice</button>` : ''}
+                <button class="btn-action btn-report" onclick="generateAuditCertificate()">📄 Generate Official Audit Certificate</button>
+                <button class="btn-action btn-cad" onclick="exportCurrentUnitToCAD()">📐 Export 3D Strata Unit to CAD (.DXF)</button>
+              </div>
+            `;
+          }
         }
       }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
     }
 
-    // Geometry Helpers & Extrusion
+    // Geometry Helpers & 3D Extrusion with Red/Orange Indicators
     function geojsonToHierarchy(geometry) {
       if (!geometry || !geometry.coordinates) return null;
       const exteriorRing = (geometry.type === "MultiPolygon") ? geometry.coordinates[0][0] : geometry.coordinates[0];
       return new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(exteriorRing.flat()));
     }
 
+    // Dynamic 3D Storey Extrusion with Red / Orange / Green Audit State Colorations
     function extrudeBuildingTo3D(entity) {
       if (!viewer) return;
       is3DMode = true;
       clearDynamic3D();
 
       const p = entity.properties;
-      const name = p.name.getValue();
-      const parcelId = p.parcel_id.getValue();
-      const levels = p.levels.getValue();
+      const name = p.name ? p.name.getValue() : "Structure";
+      const parcelId = p.parcel_id ? p.parcel_id.getValue() : "PARCEL";
+      const levels = p.levels ? p.levels.getValue() : 6;
+
+      const auditState = p.audit_state ? p.audit_state.getValue() : (p.fill_color ? (p.fill_color.getValue() === '#dc2626' ? 'RED' : (p.fill_color.getValue() === '#f59e0b' ? 'ORANGE' : 'GREEN')) : 'GREEN');
+      const hasDiscrepancy = p.has_discrepancy ? p.has_discrepancy.getValue() : (auditState === 'RED');
+      const isRed = (auditState === 'RED' || hasDiscrepancy);
+      const isOrange = (auditState === 'ORANGE');
+
       const GROUND_ELEVATION = 11.5;
       const FLOOR_HEIGHT = 3.2;
 
@@ -1049,22 +1144,105 @@
         unitHierarchies = [entity.polygon.hierarchy.getValue(Cesium.JulianDate.now())];
       }
 
+      // Basement B1 Parking
+      const fullHierarchy = entity.polygon.hierarchy.getValue(Cesium.JulianDate.now());
+      const b1 = viewer.entities.add({
+        polygon: {
+          hierarchy: fullHierarchy,
+          height: GROUND_ELEVATION - 4.0,
+          extrudedHeight: GROUND_ELEVATION,
+          material: Cesium.Color.fromCssColorString('#475569').withAlpha(0.75),
+          outline: true, outlineColor: Cesium.Color.fromCssColorString('#facc15')
+        },
+        properties: {
+          is_3d_unit: true, is_subsurface: false,
+          '3D_ULPIN': `${parcelId}:T1-B01-PRK`,
+          building_name: name, floor_label: 'Basement -1', unit_label: 'Common Parking',
+          base_h: GROUND_ELEVATION - 4.0, extruded_h: GROUND_ELEVATION,
+          variance: 0, confidence_score: 98.2,
+          sensor_source: "Foundation As-Built Blueprints",
+          audit_state: "GREEN",
+          action: 'Compliant with Municipal Subsurface Parking Regulations'
+        }
+      });
+      dynamic3DGroup.push(b1);
+
+      // Storeys 1..N
       for (let floor = 1; floor <= levels; floor++) {
         const baseH = GROUND_ELEVATION + ((floor - 1) * FLOOR_HEIGHT);
         const topH = GROUND_ELEVATION + (floor * FLOOR_HEIGHT);
 
         for (let u = 0; u < unitHierarchies.length; u++) {
-          const flatUlpin = `${parcelId}:T1-F${floor.toString().padStart(2, '0')}-U${(u+1).toString().padStart(2, '0')}`;
+          const unitIdx = u + 1;
+          const unitCode = `U${unitIdx.toString().padStart(2, '0')}`;
+          const flatUlpin = `${parcelId}:T1-F${floor.toString().padStart(2, '0')}-${unitCode}`;
+
+          let hexColor = '#16a34a'; // Default Green
+          let alpha = 0.65;
+          let outlineColor = Cesium.Color.fromCssColorString('#facc15');
+          let outlineWidth = 1.5;
+          let unitState = 'GREEN';
+          let floorLabel = `Storey Level ${floor}`;
+          let unitLabel = `Unit ${unitIdx.toString().padStart(2, '0')}`;
+          let variance = 0.6;
+          let auditAction = 'Verified Match: User Claim Matches Government Records & Master Plan';
+          let sensorSrc = 'Airborne LiDAR + Satellite Alignment';
+
+          // If building is RED (mismatched/unauthorized addition), top floor(s) are highlighted in RED!
+          if (isRed && floor === levels) {
+            hexColor = '#dc2626';
+            alpha = 0.88;
+            outlineColor = Cesium.Color.WHITE;
+            outlineWidth = 2.5;
+            unitState = 'RED';
+            floorLabel = `Level ${floor} (Unauthorized Addition)`;
+            variance = 28.0;
+            auditAction = 'Section 217 Notice: Encroachment Demolition / Regularization Order';
+            sensorSrc = 'LiDAR Rooftop Point Cloud Anomaly (+28% Height)';
+          } else if (isRed && floor >= levels - 1 && levels > 4) {
+            hexColor = '#dc2626';
+            alpha = 0.80;
+            outlineColor = Cesium.Color.fromCssColorString('#ef4444');
+            outlineWidth = 2.0;
+            unitState = 'RED';
+            floorLabel = `Level ${floor} (Sanction Breach)`;
+            variance = 24.0;
+            auditAction = 'Sanctioned Height Exceeded; Legal Notice Pending';
+            sensorSrc = 'LiDAR Elevation Anomaly';
+          } else if (isOrange) {
+            hexColor = '#d97706';
+            alpha = 0.80;
+            outlineColor = Cesium.Color.fromCssColorString('#facc15');
+            outlineWidth = 2.0;
+            unitState = 'ORANGE';
+            floorLabel = `Storey Level ${floor} (Unclaimed Strata)`;
+            variance = 6.4;
+            auditAction = 'Unregistered / Unclaimed Commercial Asset';
+            sensorSrc = 'Satellite Optical Feature Extraction';
+          }
+
           const flatEntity = viewer.entities.add({
             polygon: {
-              hierarchy: unitHierarchies[u], height: baseH, extrudedHeight: topH,
-              material: Cesium.Color.fromCssColorString('#16a34a').withAlpha(0.65),
-              outline: true, outlineColor: Cesium.Color.fromCssColorString('#facc15')
+              hierarchy: unitHierarchies[u],
+              height: baseH,
+              extrudedHeight: topH,
+              material: Cesium.Color.fromCssColorString(hexColor).withAlpha(alpha),
+              outline: true,
+              outlineColor: outlineColor,
+              outlineWidth: outlineWidth
             },
             properties: {
-              is_3d_unit: true, '3D_ULPIN': flatUlpin, building_name: name,
-              floor_label: `Storey Level ${floor}`, unit_label: `Unit ${u+1}`,
-              base_h: baseH, extruded_h: topH, variance: 0.6, confidence_score: 98.2, audit_state: 'GREEN', action: 'Verified Match'
+              is_3d_unit: true, is_subsurface: false,
+              '3D_ULPIN': flatUlpin,
+              building_name: name,
+              floor_label: floorLabel,
+              unit_label: unitLabel,
+              base_h: baseH, extruded_h: topH,
+              variance: variance,
+              confidence_score: isRed ? 96.4 : (isOrange ? 87.5 : 98.2),
+              sensor_source: sensorSrc,
+              audit_state: unitState,
+              action: auditAction
             }
           });
           dynamic3DGroup.push(flatEntity);
@@ -1075,7 +1253,7 @@
       document.getElementById('panelTitle').innerText = "3D Strata Unit Extrusion";
       document.getElementById('btnReset2D').style.display = "block";
 
-      viewer.flyTo(dynamic3DGroup, { duration: 1.8, offset: new Cesium.HeadingPitchRange(Cesium.Math.toRadians(35), Cesium.Math.toRadians(-35), 180) });
+      viewer.flyTo(dynamic3DGroup, { duration: 1.8, offset: new Cesium.HeadingPitchRange(Cesium.Math.toRadians(35), Cesium.Math.toRadians(-35), Math.max(160, levels * 18)) });
     }
 
     function clearDynamic3D() {
